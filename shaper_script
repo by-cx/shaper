@@ -1,0 +1,9 @@
+rate=4M ceil=4M
+    rate=2M ceil=2M
+        rate=1M ceil=1.5M ip=89.111.104.66
+        rate=1M ceil=1.5M ip=89.111.104.67
+    rate=2M ceil=2M
+        rate=0.5M ceil=1.5M ip=89.111.104.70
+        rate=0.5M ceil=1.5M ip=89.111.104.71
+        rate=0.5M ceil=1.5M ip=89.111.104.72
+        rate=0.5M ceil=1.5M ip=89.111.104.73
