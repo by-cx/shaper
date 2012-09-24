@@ -9,8 +9,11 @@ def print_error(msg):
 
 
 class ShaperScript(object):
-    def __init__(self, script):
+    def __init__(self, script, interface, max_rate, max_ceil):
         self.script = script
+        self.interface = interface
+        self.max_ceil = max_ceil
+        self.max_rate = max_rate
 
     def load(self):
         with open(self.script) as f:
@@ -52,6 +55,43 @@ class ShaperScript(object):
         rules = self.load()
         tree = line_parse2(rules)
         return tree
+
+        def translate(self):
+            defs = {
+                "qdisc-del": "qdisc del dev %(iface)s root",
+                "qdisc-root": "qdisc add dev %(iface)s root handle 1: hfsc",
+                "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s: sfq perturb 10",
+                "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s hfsc sc rate %(rate)skbit ul rate %(ceil)skbit",
+                "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip dst %(ip)s flowid %(qid)s",
+                "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 dst %(ip)s flowid %(qid)s",
+            }
+
+            def make_rules(subtree, cid_counter, qid_counter):
+                rules = []
+                for rule in subtree:
+                    rule
+                    if "subtree" in rule and rule["subtree"]:
+                        rules += make_rules(rule["subtree"])
+                return rules
+
+            rules = [
+                defs["qdisc-del"] % {"iface": self.interface},
+                defs["qdisc-root"] % {"iface": self.interface},
+                defs["class"] % {
+                    "iface": self.interface,
+                    "parent": "1:",
+                    "cid": "1:1",
+                    "qid": "",
+                    "rate": "",
+                    "ceil": "",
+                },
+            ]
+            qid_counter = 1
+            cid_counter = 1
+
+            tree = self.parse()
+            rules += make_rules(tree, cid_counter, qid_counter)
+
 
 if __name__ == "__main__":
     shaper_script = ShaperScript("shaper_script")
