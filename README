@@ -1,0 +1,34 @@
+Shaper tool
+
+
+
+    Usage: shaperctl.py [options]
+
+    Options:
+      -h, --help            show this help message and exit
+      -a, --add             Add new rule
+      -t IP/NETMASK, --target=IP/NETMASK
+                            Target (IP(v6) address, network)
+      -m MARK, --mark=MARK  Filter by iptables mark (not supported now)
+      -p NAME, --parent=NAME
+                            Parent of rule
+      -n NAME, --name=NAME  Rule identificator
+      -r NUMBER, --rate=NUMBER
+                            Rate (guaranteed speed)
+      -c NUMBER, --ceil=NUMBER
+                            Ceil (maximal speed)
+      -g, --commit          Commit the changes
+      -s, --shutdown        Shutdown the shapes
+      --print               Print the shapes
+
+Script example:
+
+    rate=4000 ceil=4000 name=main
+        rate=2000 ceil=2000 name=tube_a
+            rate=1000 ceil=1500 ip=89.111.104.66
+            rate=1000 ceil=1500 ip=89.111.104.67
+        rate=2000 ceil=2000 name=tube_b
+            rate=500 ceil=1500 ip=89.111.104.70
+            rate=500 ceil=1500 ip=89.111.104.71
+            rate=500 ceil=1500 ip=89.111.104.72
+            rate=500 ceil=1500 ip=192.168.239.182/32

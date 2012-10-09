@@ -7,6 +7,7 @@ from optparse import OptionParser, OptionGroup, TitledHelpFormatter
 ##Parsování parametrů
 parser = OptionParser()
 parser.add_option("-a", "--add", dest="add", help="Add new rule", action="store_true")
+parser.add_option("-d", "--direction", dest="direction", help="Direction", metavar="UP/DOWN")
 parser.add_option("-t", "--target", dest="target", help="Target (IP(v6) address, network)", metavar="IP/NETMASK")
 parser.add_option("-m", "--mark", dest="mark", help="Filter by iptables mark (not supported now)", metavar="MARK")
 parser.add_option("-p", "--parent", dest="parent", help="Parent of rule", metavar="NAME")
@@ -15,6 +16,7 @@ parser.add_option("-r", "--rate", dest="rate", help="Rate (guaranteed speed)", m
 parser.add_option("-c", "--ceil", dest="ceil", help="Ceil (maximal speed)", metavar="NUMBER")
 parser.add_option("-g", "--commit", dest="commit", help="Commit the changes", action="store_true")
 parser.add_option("-s", "--shutdown", dest="shutdown", help="Shutdown the shapes", action="store_true")
+parser.add_option("--print", dest="print", help="Print the shapes", action="store_true")
 
 
 (options, args) = parser.parse_args()
