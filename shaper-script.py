@@ -12,15 +12,7 @@ def print_error(msg):
 
 class ShaperException(Exception): pass
 
-class ShaperScript(object):
-    def __init__(self, script, interface, global_rate, global_ceil, ip_type="dst"):
-        self.script = script
-        self.interface = interface
-        self.global_ceil = global_ceil
-        self.global_rate = global_rate
-        self.ip_type = ip_type  # dst | src
-        self.data = []
-
+class ShaperConfig(object):
     def config(self):
         default = {
             "interface": "eth0",
@@ -56,6 +48,15 @@ class ShaperScript(object):
         data["counter"] += 1
         with open("/var/lib/shapertool/config.json", "w") as f:
                 f.write(json.dumps(data, indent=4))
+
+class ShaperScript(object):
+    def __init__(self, script, interface, global_rate, global_ceil, ip_type="dst"):
+        self.script = script
+        self.interface = interface
+        self.global_ceil = global_ceil
+        self.global_rate = global_rate
+        self.ip_type = ip_type  # dst | src
+        self.data = []
 
     def load(self):
         with open(self.script) as f:
