@@ -3,9 +3,11 @@ import re
 import os
 import json
 
-# 400  2xpce
+# 650  2xpce
 # 1200 3h
 # 800  2h shapercli
+# 1600 4h
+
 
 def print_error(msg):
     print msg
@@ -13,13 +15,15 @@ def print_error(msg):
 class ShaperException(Exception): pass
 
 class ShaperConfig(object):
+    #TODO: config check (number of imqs)
     def config(self):
         default = {
             "interface": "eth0",
             "imqs_up": ["imq0", "imq1"],
             "imqs_down": ["imq2", "imq3"],
             "iptables_chain": "SHAPER",
-            "change_counter": 0
+            "change_counter": 0,
+            "shaper_script": "/etc/shaper.conf",
         }
         if not os.path.isdir("/var/lib/shapertool"):
             os.makedirs("/var/lib/shapertool")
@@ -45,20 +49,40 @@ class ShaperConfig(object):
 
     def counter(self):
         data = self.config()
-        data["counter"] += 1
+        data["change_counter"] += 1
         with open("/var/lib/shapertool/config.json", "w") as f:
                 f.write(json.dumps(data, indent=4))
 
 class ShaperScript(object):
-    def __init__(self, script, interface, global_rate, global_ceil, ip_type="dst"):
+    defs = {}
+    defs["hfsc"] = {
+        "qdisc-del": "qdisc del dev %(iface)s root",
+        "qdisc-root": "qdisc add dev %(iface)s root handle 1: hfsc",
+        "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s sfq perturb 10",
+        "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s hfsc sc rate %(rate)skbit ul rate %(ceil)skbit",
+        "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip dst %(ip)s flowid %(qid)s",
+        "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 dst %(ip)s flowid %(qid)s",
+        }
+    defs["htb"] = {
+        "qdisc-del": "qdisc del dev %(iface)s root",
+        "qdisc-root": "qdisc add dev %(iface)s root handle 1: htb r2q 30",
+        "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s sfq perturb 10",
+        "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s htb rate %(rate)skbit ceil %(ceil)skbit",
+        "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip %(ip_type)s %(ip)s flowid %(qid)s",
+        "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 %(ip_type)s %(ip)s flowid %(qid)s",
+        }
+
+    def __init__(self, script, interface, ip_type="dst"):
         self.script = script
         self.interface = interface
-        self.global_ceil = global_ceil
-        self.global_rate = global_rate
+        #self.global_ceil = global_ceil
+        #self.global_rate = global_rate
         self.ip_type = ip_type  # dst | src
         self.data = []
-
-    def load(self):
+        self.handler = "htb"
+        self._load()
+    def _load(self):
+        "load script from the file"
         with open(self.script) as f:
             return [x.strip("\n") for x in f.readlines() if x.strip("\n")]
 
@@ -78,11 +102,16 @@ class ShaperScript(object):
                 lines += self._format(subtree, deep + 1)
         return lines
 
+    def shutdown(self):
+        return self.defs[self.handler]["qdisc-del"] % {"iface": self.interface}
+
     def save(self):
+        "Save script to the file"
         with open(self.script, "w") as f:
             f.write("\n".join(self._format(self.data)))
 
     def print_tree(self):
+        "Print tc calls on stdout"
         print "\n".join(self._format(self.data))
 
     def _rule_syntax(self, item):
@@ -103,6 +132,7 @@ class ShaperScript(object):
             raise ShaperException("Syntax error: %s (%s)" % (" | ".join(errors), item))
 
     def add_rule(self, new_item, parent=None):
+        "Add new rule"
         self._rule_syntax(new_item)
         def find(tree):
             for item in tree:
@@ -122,10 +152,11 @@ class ShaperScript(object):
         elif not parent:
             self.data.append(new_item)
         else:
-            if not find(self.data):
+            if not find(self.parse()):
                 raise ShaperException("Error: parent '%s' doesn't exists" % parent)
 
     def rm_rule(self, name):
+        "Remove any rule and tree under it"
         def find(tree):
             for item in tree:
                 if ("name" in item and item["name"] == name) or \
@@ -136,9 +167,10 @@ class ShaperScript(object):
                     if find(item["subtree"]):
                         return True
             return False
-        return find(self.data)
+        return find(self.parse())
 
     def parse(self):
+        "Parse tree from the file. Content from self.script is loaded here."
         def line_parse2(data, index=0, deep=0):
             subtree = []
             while True:
@@ -173,40 +205,22 @@ class ShaperScript(object):
                 index += 1
             return index, subtree
 
-        rules = self.load()
+        rules = self._load()
         tree = line_parse2(rules)
         self.data = tree[1]
         return tree[1]
 
     def translate(self):
-        defs = {}
-        defs["hfsc"] = {
-            "qdisc-del": "qdisc del dev %(iface)s root",
-            "qdisc-root": "qdisc add dev %(iface)s root handle 1: hfsc",
-            "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s sfq perturb 10",
-            "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s hfsc sc rate %(rate)skbit ul rate %(ceil)skbit",
-            "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip dst %(ip)s flowid %(qid)s",
-            "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 dst %(ip)s flowid %(qid)s",
-        }
-        defs["htb"] = {
-            "qdisc-del": "qdisc del dev %(iface)s root",
-            "qdisc-root": "qdisc add dev %(iface)s root handle 1: htb r2q 30",
-            "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s sfq perturb 10",
-            "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s htb rate %(rate)skbit ceil %(ceil)skbit",
-            "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip %(ip_type)s %(ip)s flowid %(qid)s",
-            "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 %(ip_type)s %(ip)s flowid %(qid)s",
-        }
-
-        handler = "htb"
+        "Translate JSON format into "
         qid_counter = 1
-        cid_counter = 1
+        cid_counter = 0
 
         def make_rules(subtree, cid_counter, qid_counter):
             parent_cid = cid_counter
             rules = []
             for rule in subtree:
                 cid_counter += 1
-                rules.append(defs[handler]["class"] % {
+                rules.append(self.defs[self.handler]["class"] % {
                     "iface": self.interface,
                     "parent": "1:%d" % parent_cid,
                     "cid": "1:%d" % cid_counter,
@@ -218,12 +232,12 @@ class ShaperScript(object):
                     rules += subrules
                 elif "ip" in rule and rule["ip"]:
                     qid_counter += 1
-                    rules.append(defs[handler]["qdisc"] % {
+                    rules.append(self.defs[self.handler]["qdisc"] % {
                         "iface": self.interface,
                         "parent": "1:%d" % cid_counter,
                         "qid": "%d:" % qid_counter,
                     })
-                    rules.append(defs[handler]["filter4" if "." in rule["ip"] else "filter6"] % {
+                    rules.append(self.defs[self.handler]["filter4" if "." in rule["ip"] else "filter6"] % {
                         "iface": self.interface,
                         "parent": "1:",
                         "ip": rule["ip"],
@@ -234,15 +248,15 @@ class ShaperScript(object):
             return cid_counter, qid_counter, rules
 
         rules = [
-            defs[handler]["qdisc-del"] % {"iface": self.interface},
-            defs[handler]["qdisc-root"] % {"iface": self.interface},
-            defs[handler]["class"] % {
-                "iface": self.interface,
-                "parent": "1:",
-                "cid": "1:1",
-                "rate": self.global_rate,
-                "ceil": self.global_ceil,
-            },
+            self.defs[self.handler]["qdisc-del"] % {"iface": self.interface},
+            self.defs[self.handler]["qdisc-root"] % {"iface": self.interface},
+            #self.defs[self.handler]["class"] % {
+            #    "iface": self.interface,
+            #    "parent": "1:",
+            #    "cid": "1:1",
+            #    "rate": self.global_rate,
+            #    "ceil": self.global_ceil,
+            #},
         ]
 
         tree = self.parse()
@@ -259,7 +273,7 @@ if __name__ == "__main__":
     #data = shaper_script.parse()
     #print json.dumps(data, indent=4)
     shaper_script.parse()
-    print shaper_script.config()
+    #print shaper_script.config()
     #shaper_script.rm_rule("89.111.104.71")
     #shaper_script.add_rule({"rate": "1000", "ceil": "2000", "ip": "192.168.1.5/32"}, "tube_a")
     shaper_script.print_tree()
