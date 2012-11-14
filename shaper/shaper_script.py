@@ -81,6 +81,11 @@ class ShaperScript(object):
         self.data = []
         self.handler = "htb"
         self._load()
+
+    @property
+    def direction(self):
+        return "up" if self.ip_type == "src" else "down"
+
     def _load(self):
         "load script from the file"
         with open(self.script) as f:
@@ -118,16 +123,26 @@ class ShaperScript(object):
         errors = []
         if not "name" in item and not "ip" in item:
             errors.append("No name or ip")
-        if not "ceil" in item:
-            errors.append("Ceil is missing")
-        if not "rate" in item:
-            errors.append("Rate is missing")
-        if "rate" in item:
-            if not re.match("^[0-9kmKM]*$", item["rate"]):
-                errors.append("Rate is in wrong format")
-        if "ceil" in item:
-            if not re.match("^[0-9kmKM]*$", item["ceil"]):
-                errors.append("Ceil is in wrong format")
+        if not "up_ceil" in item:
+            errors.append("Ceil up is missing")
+        if not "up_rate" in item:
+            errors.append("Rate up is missing")
+        if not "down_ceil" in item:
+            errors.append("Ceil down is missing")
+        if not "down_rate" in item:
+            errors.append("Rate down is missing")
+        if "up_rate" in item:
+            if not re.match("^[0-9kmKM]*$", item["up_rate"]):
+                errors.append("Rate up is in wrong format")
+        if "up_ceil" in item:
+            if not re.match("^[0-9kmKM]*$", item["up_ceil"]):
+                errors.append("Ceil up is in wrong format")
+        if "down_rate" in item:
+            if not re.match("^[0-9kmKM]*$", item["down_rate"]):
+                errors.append("Rate down is in wrong format")
+        if "down_ceil" in item:
+            if not re.match("^[0-9kmKM]*$", item["down_ceil"]):
+                errors.append("Ceil down is in wrong format")
         if errors:
             raise ShaperException("Syntax error: %s (%s)" % (" | ".join(errors), item))
 
@@ -186,7 +201,7 @@ class ShaperScript(object):
                             for x in rule.split():
                                 key = x.split("=")[0]
                                 value = x.split("=")[1]
-                                if key not in ("rate", "ceil","ip", "name"):
+                                if key not in ("up_rate", "up_ceil", "down_rate", "down_ceil", "ip", "name"):
                                     raise ShaperException("Wrong parametr %s on line %d" % (key, index))
                                 item[key] = value
                             self._rule_syntax(item)
@@ -224,8 +239,8 @@ class ShaperScript(object):
                     "iface": self.interface,
                     "parent": "1:%d" % parent_cid,
                     "cid": "1:%d" % cid_counter,
-                    "rate": rule["rate"],
-                    "ceil": rule["ceil"],
+                    "rate": rule["%s_rate" % self.direction],
+                    "ceil": rule["%s_ceil" % self.direction],
                 })
                 if "subtree" in rule and rule["subtree"]:
                     cid_counter, qid_counter, subrules = make_rules(rule["subtree"], cid_counter, qid_counter)
@@ -269,7 +284,7 @@ class ShaperScript(object):
 
 
 if __name__ == "__main__":
-    shaper_script = ShaperScript("shaper_script", "wlan0", "10000", "10000", "src")
+    shaper_script = ShaperScript("shaper_script", "wlan0", "src")
     #data = shaper_script.parse()
     #print json.dumps(data, indent=4)
     shaper_script.parse()
