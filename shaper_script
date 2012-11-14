@@ -1,9 +1,9 @@
-rate=4000 ceil=4000 name=main
-    rate=2000 ceil=2000 name=tube_a
-        rate=1000 ceil=1500 ip=89.111.104.66
-        rate=1000 ceil=1500 ip=89.111.104.67
-    rate=2000 ceil=2000 name=tube_b
-        rate=500 ceil=1500 ip=89.111.104.70
-        rate=500 ceil=1500 ip=89.111.104.71
-        rate=500 ceil=1500 ip=89.111.104.72
-        rate=500 ceil=1500 ip=192.168.239.182/32
+up_rate=4000 up_ceil=4000 down_rate=4000 down_ceil=4000 name=main
+    up_rate=2000 up_ceil=2000 down_rate=2000 down_ceil=2000 name=tube_a
+        up_rate=1000 up_ceil=1500 down_rate=1000 down_ceil=1500 ip=89.111.104.66
+        up_rate=1000 up_ceil=1500 down_rate=1000 down_ceil=1500 ip=89.111.104.67
+    up_rate=2000 up_ceil=2000 down_rate=2000 down_ceil=2000 name=tube_b
+        up_rate=500 up_ceil=1500 down_rate=500 down_ceil=1500 ip=89.111.104.70
+        up_rate=500 up_ceil=1500 down_rate=500 down_ceil=1500 ip=89.111.104.71
+        up_rate=500 up_ceil=1500 down_rate=500 down_ceil=1500 ip=89.111.104.72
+        up_rate=500 up_ceil=1500 down_rate=500 down_ceil=1500 ip=192.168.239.182/32
