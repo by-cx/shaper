@@ -66,10 +66,10 @@ class ShaperScript(object):
         "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 %(ip_type)s %(ip)s flowid %(qid)s",
     }
     defs["iptables"] = {
-        "add_up_imq_rule": "-t mangle -A SHAPER_UP -j IMG --todev %(imqnum)s",
-        "add_down_imq_rule": "-t mangle -A SHAPER_DOWN -j IMG --todev %(imqnum)s",
-        "del_up_imq_rule": "-t mangle -D SHAPER_UP -j IMG --todev %(imqnum)s",
-        "del_down_imq_rule": "-t mangle -D SHAPER_DOWN -j IMG --todev %(imqnum)s",
+        "add_up_imq_rule": "-t mangle -A SHAPER_UP -j IMQ --todev %(imqnum)s",
+        "add_down_imq_rule": "-t mangle -A SHAPER_DOWN -j IMQ --todev %(imqnum)s",
+        "del_up_imq_rule": "-t mangle -D SHAPER_UP -j IMQ --todev %(imqnum)s",
+        "del_down_imq_rule": "-t mangle -D SHAPER_DOWN -j IMQ --todev %(imqnum)s",
     }
 
     def __init__(self, script, interface, opposite_interface_num, ip_type="dst"):
