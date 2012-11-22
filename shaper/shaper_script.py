@@ -18,7 +18,6 @@ class ShaperConfig(object):
     #TODO: config check (number of imqs)
     def config(self):
         default = {
-            "interface": "eth0",
             "imqs_up": [0, 1],
             "imqs_down": [2, 3],
             "change_counter": 0,
@@ -34,8 +33,6 @@ class ShaperConfig(object):
             with open("/var/lib/shapertool/config.json") as f:
                 data = json.loads(f.read())
             # TODO: better checks, own class propably
-            if not "interface" in data:
-                raise ShaperException("Error: missing interface field in config")
             if not "imqs_up" in data:
                 raise ShaperException("Error: missing imqs_up field in config")
             if not "imqs_down" in data:
