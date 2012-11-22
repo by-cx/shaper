@@ -16,8 +16,10 @@ def main():
     parser.add_option("-m", "--mark", dest="mark", help="Filter by iptables mark (not supported now)", metavar="MARK")
     parser.add_option("-p", "--parent", dest="parent", help="Parent of rule", metavar="NAME")
     parser.add_option("-n", "--name", dest="name", help="Rule identificator", metavar="NAME")
-    parser.add_option("-r", "--rate", dest="rate", help="Rate (guaranteed speed)", metavar="NUMBER")
-    parser.add_option("-c", "--ceil", dest="ceil", help="Ceil (maximal speed)", metavar="NUMBER")
+    parser.add_option("--ur", "--up-rate", dest="up_rate", help="Up rate (guaranteed speed)", metavar="NUMBER")
+    parser.add_option("--uc", "--up-ceil", dest="up_ceil", help="Up ceil (maximal speed)", metavar="NUMBER")
+    parser.add_option("--dr", "--down-rate", dest="down_rate", help="Down rate (guaranteed speed)", metavar="NUMBER")
+    parser.add_option("--dc", "--down-ceil", dest="down_ceil", help="Down ceil (maximal speed)", metavar="NUMBER")
     parser.add_option("-g", "--commit", dest="commit", help="Commit the changes", action="store_true")
     parser.add_option("-s", "--shutdown", dest="shutdown", help="Shutdown the shapes", action="store_true")
     parser.add_option("--print", dest="print_shapes", help="Print the shapes", action="store_true")
@@ -32,10 +34,14 @@ def main():
 	    errors.append("missing name")
 	#if not options.target:
 	#    errors.append("No target")
-	if not options.rate:
-	    errors.append("missing rate")
-	if not options.ceil:
-	    errors.append("missing ceil")
+	if not options.up_rate:
+	    errors.append("missing up rate")
+	if not options.up_ceil:
+	    errors.append("missing up ceil")
+	if not options.down_rate:
+	    errors.append("missing down rate")
+	if not options.down_ceil:
+	    errors.append("missing down ceil")
 	if errors:
 	    raise ShaperException("Error: %s" % ",".join(errors))
 
@@ -43,8 +49,10 @@ def main():
 
 	item = {
 	    "name": options.name,
-	    "ceil": options.ceil,
-	    "rate": options.rate,
+	    "up_ceil": options.up_ceil,
+	    "up_rate": options.up_rate,
+	    "down_ceil": options.down_ceil,
+	    "down_rate": options.down_rate,
 	}
 	if options.target:
 	    item["ip"] = options.target
@@ -70,7 +78,7 @@ def main():
 
 	interfaces = config["imqs_down"] + config["imqs_up"]
 	for interface in interfaces:
-	    print ShaperScript(config["shaper_script"], interface, "").shutdown()
+	    print ShaperScript(config["shaper_script"], interface, 0, "").shutdown()
 
 	sys.exit(0)
     elif options.print_shapes:
@@ -78,8 +86,10 @@ def main():
 
 	in_interface = config["imqs_down"][config["change_counter"] % 2]
 	out_interface = config["imqs_up"][config["change_counter"] % 2]
-	for interface, direction in ((in_interface, "dst"), (out_interface, "src")):
-	    shaper_script = ShaperScript(config["shaper_script"], interface, direction)
+	in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
+	out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
+	for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
+	    shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
 	    shaper_script.parse()
 	    shaper_script.print_tree()
 	shaper_script = ShaperScript(config["shaper_script"], "", "")
@@ -91,8 +101,10 @@ def main():
 
 	in_interface = config["imqs_down"][config["change_counter"] % 2]
 	out_interface = config["imqs_up"][config["change_counter"] % 2]
-	for interface, direction in ((in_interface, "dst"), (out_interface, "src")):
-	    shaper_script = ShaperScript(config["shaper_script"], interface, direction)
+	in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
+	out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
+	for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
+	    shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
 	    shaper_script.parse()
 	    rules = shaper_script.translate()
 	    for rule in rules:
@@ -116,4 +128,5 @@ def main():
     print "\t%s -s" % sys.argv[0]
 
 if __name__ == "__main__":
+    #catch the exception
     main()

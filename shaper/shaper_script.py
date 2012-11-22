@@ -19,9 +19,8 @@ class ShaperConfig(object):
     def config(self):
         default = {
             "interface": "eth0",
-            "imqs_up": ["imq0", "imq1"],
-            "imqs_down": ["imq2", "imq3"],
-            "iptables_chain": "SHAPER",
+            "imqs_up": [0, 1],
+            "imqs_down": [2, 3],
             "change_counter": 0,
             "shaper_script": "/etc/shaper.conf",
         }
@@ -62,7 +61,7 @@ class ShaperScript(object):
         "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s hfsc sc rate %(rate)skbit ul rate %(ceil)skbit",
         "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip dst %(ip)s flowid %(qid)s",
         "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 dst %(ip)s flowid %(qid)s",
-        }
+    }
     defs["htb"] = {
         "qdisc-del": "qdisc del dev %(iface)s root",
         "qdisc-root": "qdisc add dev %(iface)s root handle 1: htb r2q 30",
@@ -70,17 +69,28 @@ class ShaperScript(object):
         "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s htb rate %(rate)skbit ceil %(ceil)skbit",
         "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip %(ip_type)s %(ip)s flowid %(qid)s",
         "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 %(ip_type)s %(ip)s flowid %(qid)s",
-        }
+    }
+    defs["iptables"] = {
+        "add_up_imq_rule": "-t mangle -A SHAPER_UP -j IMG --todev %(imqnum)s",
+        "add_down_imq_rule": "-t mangle -A SHAPER_DOWN -j IMG --todev %(imqnum)s",
+        "del_up_imq_rule": "-t mangle -D SHAPER_UP -j IMG --todev %(imqnum)s",
+        "del_down_imq_rule": "-t mangle -D SHAPER_DOWN -j IMG --todev %(imqnum)s",
+    }
 
-    def __init__(self, script, interface, ip_type="dst"):
+    def __init__(self, script, interface, opposite_interface_num, ip_type="dst"):
         self.script = script
-        self.interface = interface
+        self.interface_num = interface
+        self.opposite_interface_num = opposite_interface_num
         #self.global_ceil = global_ceil
         #self.global_rate = global_rate
         self.ip_type = ip_type  # dst | src
         self.data = []
         self.handler = "htb"
         self._load()
+
+    @property
+    def interface(self):
+        return "imq%d" % self.interface_num
 
     @property
     def direction(self):
@@ -262,6 +272,10 @@ class ShaperScript(object):
                     })
             return cid_counter, qid_counter, rules
 
+        ipt_rules = [
+            self.defs["iptables"]["add_%s_imq_rule" % self.direction] % {"imqnum": self.interface_num},
+            self.defs["iptables"]["del_%s_imq_rule" % self.direction] % {"imqnum": self.opposite_interface_num},
+        ]
         rules = [
             self.defs[self.handler]["qdisc-del"] % {"iface": self.interface},
             self.defs[self.handler]["qdisc-root"] % {"iface": self.interface},
@@ -277,22 +291,15 @@ class ShaperScript(object):
         tree = self.parse()
         cid_counter, qid_counter, subrules = make_rules(tree, cid_counter, qid_counter)
 
-        def command_map(line):
+        def command_tc_map(line):
             return "/sbin/tc %s" % line
+        def command_ipt_map(line):
+            return "/sbin/iptables %s" % line
 
-        return map(command_map, rules + subrules)
+        return map(command_tc_map, rules + subrules) + map(command_ipt_map, ipt_rules)
 
 
 if __name__ == "__main__":
     shaper_script = ShaperScript("shaper_script", "wlan0", "src")
-    #data = shaper_script.parse()
-    #print json.dumps(data, indent=4)
     shaper_script.parse()
-    #print shaper_script.config()
-    #shaper_script.rm_rule("89.111.104.71")
-    #shaper_script.add_rule({"rate": "1000", "ceil": "2000", "ip": "192.168.1.5/32"}, "tube_a")
     shaper_script.print_tree()
-
-    #rules = shaper_script.translate()
-    #for rule in rules:
-    #    print rule
