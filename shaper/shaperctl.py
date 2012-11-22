@@ -98,13 +98,10 @@ def main():
         config = shaper_config.config()
 
         in_interface = config["imqs_down"][config["change_counter"] % 2]
-        out_interface = config["imqs_up"][config["change_counter"] % 2]
         in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
-        out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
-        for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
-            shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
-            shaper_script.parse()
-            shaper_script.print_tree()
+        shaper_script = ShaperScript(config["shaper_script"], in_interface, in_opposite_interface, "dst")
+        shaper_script.parse()
+        shaper_script.print_tree()
         shaper_script = ShaperScript(config["shaper_script"], "", "")
         shaper_script.parse()
 
