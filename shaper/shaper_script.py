@@ -40,8 +40,6 @@ class ShaperConfig(object):
                 raise ShaperException("Error: missing imqs_up field in config")
             if not "imqs_down" in data:
                 raise ShaperException("Error: missing imqs_down field in config")
-            if not "iptables_chain" in data:
-                raise ShaperException("Error: missing iptables_chain field in config")
             if not "change_counter" in data:
                 raise ShaperException("Error: missing change_counter field in config")
             return data
