@@ -1,11 +1,24 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys, os, datetime
+import sys, os, datetime, shlex
+from subprocess import Popen, PIPE
 from optparse import OptionParser, OptionGroup, TitledHelpFormatter
 
 ##Parsování parametrů
 from shaper_script import ShaperScript, ShaperConfig, ShaperException
+
+def run(cmd):
+    cmd_list = shlex.split(cmd)
+    p = Popen(cmd_list, stdout=PIPE, stderr=PIPE)
+    stdout, stderr = p.communicate()
+    if stdout or stderr:
+        print "[cmd]:", cmd
+    if stdout:
+        print "[stdout]:", stdout
+    if stderr:
+        print "[stderr]:", stderr
+    return stdout, stderr
 
 def main():
     parser = OptionParser()
@@ -29,88 +42,88 @@ def main():
     shaper_config = ShaperConfig()
 
     if options.add:
-	errors = []
-	if not options.name:
-	    errors.append("missing name")
-	#if not options.target:
-	#    errors.append("No target")
-	if not options.up_rate:
-	    errors.append("missing up rate")
-	if not options.up_ceil:
-	    errors.append("missing up ceil")
-	if not options.down_rate:
-	    errors.append("missing down rate")
-	if not options.down_ceil:
-	    errors.append("missing down ceil")
-	if errors:
-	    raise ShaperException("Error: %s" % ",".join(errors))
+        errors = []
+        if not options.name:
+            errors.append("missing name")
+        #if not options.target:
+        #    errors.append("No target")
+        if not options.up_rate:
+            errors.append("missing up rate")
+        if not options.up_ceil:
+            errors.append("missing up ceil")
+        if not options.down_rate:
+            errors.append("missing down rate")
+        if not options.down_ceil:
+            errors.append("missing down ceil")
+        if errors:
+            raise ShaperException("Error: %s" % ",".join(errors))
 
-	config = shaper_config.config()
+        config = shaper_config.config()
 
-	item = {
-	    "name": options.name,
-	    "up_ceil": options.up_ceil,
-	    "up_rate": options.up_rate,
-	    "down_ceil": options.down_ceil,
-	    "down_rate": options.down_rate,
-	}
-	if options.target:
-	    item["ip"] = options.target
+        item = {
+            "name": options.name,
+            "up_ceil": options.up_ceil,
+            "up_rate": options.up_rate,
+            "down_ceil": options.down_ceil,
+            "down_rate": options.down_rate,
+        }
+        if options.target:
+            item["ip"] = options.target
 
-	shaper_script = ShaperScript(config["shaper_script"], "", "")
-	shaper_script.add_rule(item, parent=options.parent)
-	shaper_script.save()
+        shaper_script = ShaperScript(config["shaper_script"], "", "")
+        shaper_script.add_rule(item, parent=options.parent)
+        shaper_script.save()
 
-	sys.exit(0)
+        sys.exit(0)
     elif options.remove:
-	errors = []
-	if not options.name:
-	    errors.append("missing name")
-	if errors:
-	    raise ShaperException("Error: %s" % ",".join(errors))
-	config = shaper_config.config()
-	shaper_script = ShaperScript(config["shaper_script"], "", "")
-	shaper_script.rm_rule(name=options.name)
-	shaper_script.save()
-	sys.exit(0)
+        errors = []
+        if not options.name:
+            errors.append("missing name")
+        if errors:
+            raise ShaperException("Error: %s" % ",".join(errors))
+        config = shaper_config.config()
+        shaper_script = ShaperScript(config["shaper_script"], "", "")
+        shaper_script.rm_rule(name=options.name)
+        shaper_script.save()
+        sys.exit(0)
     elif options.shutdown:
-	config = shaper_config.config()
+        config = shaper_config.config()
 
-	interfaces = config["imqs_down"] + config["imqs_up"]
-	for interface in interfaces:
-	    print ShaperScript(config["shaper_script"], interface, 0, "").shutdown()
+        interfaces = config["imqs_down"] + config["imqs_up"]
+        for interface in interfaces:
+            print ShaperScript(config["shaper_script"], interface, 0, "").shutdown()
 
-	sys.exit(0)
+        sys.exit(0)
     elif options.print_shapes:
-	config = shaper_config.config()
+        config = shaper_config.config()
 
-	in_interface = config["imqs_down"][config["change_counter"] % 2]
-	out_interface = config["imqs_up"][config["change_counter"] % 2]
-	in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
-	out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
-	for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
-	    shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
-	    shaper_script.parse()
-	    shaper_script.print_tree()
-	shaper_script = ShaperScript(config["shaper_script"], "", "")
-	shaper_script.parse()
+        in_interface = config["imqs_down"][config["change_counter"] % 2]
+        out_interface = config["imqs_up"][config["change_counter"] % 2]
+        in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
+        out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
+        for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
+            shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
+            shaper_script.parse()
+            shaper_script.print_tree()
+        shaper_script = ShaperScript(config["shaper_script"], "", "")
+        shaper_script.parse()
 
-	sys.exit(0)
+        sys.exit(0)
     elif options.commit:
-	config = shaper_config.config()
+        config = shaper_config.config()
 
-	in_interface = config["imqs_down"][config["change_counter"] % 2]
-	out_interface = config["imqs_up"][config["change_counter"] % 2]
-	in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
-	out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
-	for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
-	    shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
-	    shaper_script.parse()
-	    rules = shaper_script.translate()
-	    for rule in rules:
-		print rule
-	shaper_config.counter()
-	sys.exit(0)
+        in_interface = config["imqs_down"][config["change_counter"] % 2]
+        out_interface = config["imqs_up"][config["change_counter"] % 2]
+        in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
+        out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
+        for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
+            shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
+            shaper_script.parse()
+            rules = shaper_script.translate()
+            for rule in rules:
+                run(rule)
+        shaper_config.counter()
+        sys.exit(0)
 
     parser.print_help()
     print
