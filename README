@@ -32,3 +32,6 @@ Script example:
             rate=500 ceil=1500 ip=89.111.104.71
             rate=500 ceil=1500 ip=89.111.104.72
             rate=500 ceil=1500 ip=192.168.239.182/32
+
+
+http://daemonkeeper.net/781/mass-blocking-ip-addresses-with-ipset/

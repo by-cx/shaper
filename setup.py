@@ -54,5 +54,7 @@ setup(
     entry_points="""
     [console_scripts]
     shaper = shaper.shaperctl:main
+    shaper_bh = shaper.bh:main
+    shaper_ipv6sync = shaper.ipv6_sync:main
     """
 )

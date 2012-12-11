@@ -1,0 +1,10 @@
+{
+	"url": "http://demo.best-net.cz/webservice/",
+    "userpass": ["webservice", ""],
+    "ban_chain": "BAN",
+    "ips_filename": "/etc/shaper.conf",
+    "ipv6_setting_filename": "/etc/ipv6.conf",
+    "sleep_time": 20,
+    "logfile": "/var/log/shaper.log",
+    "max_speed": 200000
+}

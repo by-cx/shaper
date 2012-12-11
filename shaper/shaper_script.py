@@ -21,7 +21,7 @@ class ShaperConfig(object):
             "imqs_up": [0, 1],
             "imqs_down": [2, 3],
             "change_counter": 0,
-            "shaper_script": "/etc/shaper.conf",
+            "shaper_script": "/etc/shaper_list.conf",
         }
         if not os.path.isdir("/var/lib/shapertool"):
             os.makedirs("/var/lib/shapertool")
