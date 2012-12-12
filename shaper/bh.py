@@ -13,7 +13,7 @@ from subprocess import Popen, PIPE
 import datetime
 import syslog
 
-OFF=True
+OFF=False
 
 shaper_initiated = False
 TIMEOUT = 10
@@ -178,6 +178,7 @@ def loop():
         print "Shaper reload"
         #run shaper
         run("shaper -g")
+        run("shaper_ipv6sync")
         log("Reload/init performed")
     if last_loop != -1:
         counter += time.time() - last_loop

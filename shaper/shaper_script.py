@@ -55,7 +55,7 @@ class ShaperScript(object):
         "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s sfq perturb 10",
         "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s hfsc sc rate %(rate)skbit ul rate %(ceil)skbit",
         "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip dst %(ip)s flowid %(qid)s",
-        "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 dst %(ip)s flowid %(qid)s",
+        "filter6": "filter add dev %(iface)s parent %(parent)s protocol ipv6 prio 200 u32 match ip6 dst %(ip)s flowid %(qid)s",
     }
     defs["htb"] = {
         "qdisc-del": "qdisc del dev %(iface)s root",
@@ -63,7 +63,7 @@ class ShaperScript(object):
         "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s sfq perturb 10",
         "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s htb rate %(rate)skbit ceil %(ceil)skbit",
         "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip %(ip_type)s %(ip)s flowid %(qid)s",
-        "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 %(ip_type)s %(ip)s flowid %(qid)s",
+        "filter6": "filter add dev %(iface)s parent %(parent)s protocol ipv6 prio 200 u32 match ip6 %(ip_type)s %(ip)s flowid %(qid)s",
     }
     defs["iptables"] = {
         "add_up_imq_rule": "-t mangle -A SHAPER_UP -j IMQ --todev %(imqnum)s",

@@ -83,7 +83,7 @@ def sync():
 def main():
     for x in sync():
         print x
-        p = Popen(shlex.split(x), stdout=PIPE, stderr=PIPE)
+        p = Popen(x.split(), stdout=PIPE, stderr=PIPE)
         stdout, stderr = p.communicate()
         if stdout: print stdout
         if stderr: print stderr
