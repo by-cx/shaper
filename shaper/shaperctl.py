@@ -36,6 +36,7 @@ def main():
     parser.add_option("-g", "--commit", dest="commit", help="Commit the changes", action="store_true")
     parser.add_option("-s", "--shutdown", dest="shutdown", help="Shutdown the shapes", action="store_true")
     parser.add_option("--print", dest="print_shapes", help="Print the shapes", action="store_true")
+    parser.add_option("--print_cmds", dest="print_cmds", help="Print commands (just for debug)", action="store_true")
 
     (options, args) = parser.parse_args()
 
@@ -120,6 +121,20 @@ def main():
             for rule in rules:
                 run(rule)
         shaper_config.counter()
+        sys.exit(0)
+    elif options.print_cmds:
+        config = shaper_config.config()
+
+        in_interface = config["imqs_down"][config["change_counter"] % 2]
+        out_interface = config["imqs_up"][config["change_counter"] % 2]
+        in_opposite_interface = config["imqs_down"][(config["change_counter"]+1) % 2]
+        out_opposite_interface = config["imqs_up"][(config["change_counter"]+1) % 2]
+        for interface, direction, opposite_interface in ((in_interface, "dst", in_opposite_interface), (out_interface, "src", out_opposite_interface)):
+            shaper_script = ShaperScript(config["shaper_script"], interface, opposite_interface, direction)
+            shaper_script.parse()
+            rules = shaper_script.translate()
+            for rule in rules:
+                print rule
         sys.exit(0)
 
     parser.print_help()
