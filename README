@@ -29,3 +29,6 @@ It's pretty simple to use. All you need is IMQ modul in kernel and four imqX dev
         1 - shaper is not initialized, nothing to save, use init command
         2 - caught exception, state is saved
         3 - error during script execution, state is not saved
+
+
+Developed for EXPERIA GROUP s.r.o. http://www.experia.cz/
