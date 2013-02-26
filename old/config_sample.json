@@ -1,0 +1,5 @@
+{
+    "interface": "eth0",
+    "imqs_up": ["imq0", "imq1"],
+    "imqs_down": ["imq2", "imq3"]
+}
