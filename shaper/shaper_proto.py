@@ -264,21 +264,22 @@ class Shaper(object):
                 error = True
             if stdout: print stdout
 
-        stdout, stderr = run("/sbin/iptables -t mangle -L -n")
+        #TODO: make it universal
+        stdout, stderr = run("/usr/local/sbin/iptables -t mangle -L -n")
         if not stdout or  "Chain SHAPER" not in stdout:
-            run("/sbin/iptables -t mangle -N SHAPER")
-            run("/sbin/ip6tables -t mangle -N SHAPER")
-            run("/sbin/iptables -t mangle -A PREROUTING -j SHAPER")
-            run("/sbin/iptables -t mangle -A POSTROUTING -j SHAPER")
-            run("/sbin/ip6tables -t mangle -A PREROUTING -j SHAPER")
-            run("/sbin/ip6tables -t mangle -A POSTROUTING -j SHAPER")
+            run("/usr/local/sbin/iptables -t mangle -N SHAPER")
+            run("/usr/local/sbin/ip6tables -t mangle -N SHAPER")
+            run("/usr/local/sbin/iptables -t mangle -A PREROUTING -j SHAPER")
+            run("/usr/local/sbin/iptables -t mangle -A POSTROUTING -j SHAPER")
+            run("/usr/local/sbin/ip6tables -t mangle -A PREROUTING -j SHAPER")
+            run("/usr/local/sbin/ip6tables -t mangle -A POSTROUTING -j SHAPER")
 
-        run("/sbin/iptables -t mangle -F SHAPER")
-        run("/sbin/ip6tables -t mangle -F SHAPER")
-        run("/sbin/iptables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
-        run("/sbin/iptables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
-        run("/sbin/ip6tables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
-        run("/sbin/ip6tables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
+        run("/usr/local/sbin/iptables -t mangle -F SHAPER")
+        run("/usr/local/sbin/ip6tables -t mangle -F SHAPER")
+        run("/usr/local/sbin/iptables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
+        run("/usr/local/sbin/iptables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
+        run("/usr/local/sbin/ip6tables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
+        run("/usr/local/sbin/ip6tables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
 
         self.iterator += 1
         return not error
