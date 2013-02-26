@@ -1,2 +1,9 @@
 *.pyc
+<<<<<<< HEAD
 .idea
+=======
+*.pyo
+build/
+dist/
+shaper.egg-info/
+>>>>>>> 5020ef605ea12a7dfb41803e4e2d0c0d79b08612
