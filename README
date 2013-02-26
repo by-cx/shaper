@@ -1,17 +1,23 @@
 Shaper
 ======
 
-It's pretty simple to use. All you need is IMQ modul in kernel and four imqX devices. Everything else is can manage this script.
+It's pretty simple to use. All you need is IMQ modul in kernel and four imqX devices. Everything else will manage this script.
 
+Instalation
+-----------
 
-    Usage
-        shaper init rate <RATE> ceil <CEIL> iface <IFACE>
-        shaper rule add parent <NAME> name <NAME> rate <RATE> ceil <CEIL>
-        shaper rule add parent <NAME> name <NAME> rate <RATE> ceil <CEIL> ip <IP>
-        shaper rule del name <NAME>
-        shaper commit
-        shaper list
-        shaper help
+    # pip install https://github.com/creckx/shaper/archive/master.zip
+
+Usage
+-----
+
+    shaper init rate <RATE> ceil <CEIL> iface <IFACE>
+    shaper rule add parent <NAME> name <NAME> rate <RATE> ceil <CEIL>
+    shaper rule add parent <NAME> name <NAME> rate <RATE> ceil <CEIL> ip <IP>
+    shaper rule del name <NAME>
+    shaper commit
+    shaper list
+    shaper help
 
     Units: bps,kbps,mbps,bit,kbit,mbit
     IP: regular IPv4 with or without (default /32) mask, regular IPv6 with or without prefix (default /128)
