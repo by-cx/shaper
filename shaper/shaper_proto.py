@@ -306,10 +306,8 @@ class Shaper(object):
 ## Basics
 
 def run(cmd):
-    print cmd
-    return None, None
-    #p = Popen(cmd.split(cmd), stdout=PIPE, stderr=PIPE)
-    #return p.communicate()
+    p = Popen(cmd.split(cmd), stdout=PIPE, stderr=PIPE)
+    return p.communicate()
 
 def save(shaper):
     with open(CONFIG_FILE, "w") as f:
