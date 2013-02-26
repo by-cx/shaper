@@ -1,6 +1,7 @@
 import os
 import pickle
 import re
+import shlex
 import itertools
 from subprocess import Popen, PIPE
 import sys
@@ -241,24 +242,28 @@ class Shaper(object):
         return self.root.printable_list(1)
 
     def rules_to_script(self, iface, direction):
+        global GLOBAL_CID, GLOBAL_QID
         if direction not in ("up", "down"):
             raise ShaperException("Error: direction has to be up or down")
         l = []
         l.append(DEF["qdisc-del"] % {"iface": iface})
         l.append(DEF["qdisc-root"] % {"iface": iface})
         l += self.root.script("1:0", iface, direction)
+        GLOBAL_CID=1
+        GLOBAL_QID=2
         return l
 
     def commit(self):
         iface_up = "imq%d" % INTERFACES["up"][self.iterator % 2]
         iface_down = "imq%d" % INTERFACES["down"][self.iterator % 2]
+        run("/sbin/ip l s %s up" % iface_up)
+        run("/sbin/ip l s %s up" % iface_down)
         error = False
 
         for rule in self.rules_to_script(iface_up, "up") + self.rules_to_script(iface_down, "down"):
             cmd = "/sbin/tc %s" % rule
             stdout, stderr = run(cmd)
             if stderr and stderr != "RTNETLINK answers: No such file or directory" and "qdisc del dev" not in cmd:
-                print stderr
                 sys.stderr.write("%s\n" % cmd)
                 sys.stderr.write("%s\n" % stderr)
                 error = True
@@ -284,8 +289,13 @@ class Shaper(object):
         self.iterator += 1
         return not error
 
-    def shutdown(self, iface):
-        print DEF["qdisc-del"] % {"iface": iface}
+    def shutdown(self):
+        iface_up = "imq%d" % INTERFACES["up"][(self.iterator+1) % 2]
+        iface_down = "imq%d" % INTERFACES["down"][(self.iterator+1) % 2]
+        run("/usr/local/sbin/iptables -t mangle -F SHAPER")
+        run("/usr/local/sbin/ip6tables -t mangle -F SHAPER")
+        run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_up})
+        run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_down})
 
     def add_rule(self, parent_name, name, rate, ceil, ip=None):
         if self.find_child(name, exception=False):
@@ -307,7 +317,7 @@ class Shaper(object):
 ## Basics
 
 def run(cmd):
-    p = Popen(cmd.split(cmd), stdout=PIPE, stderr=PIPE)
+    p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
     return p.communicate()
 
 def save(shaper):
@@ -338,6 +348,7 @@ CMDS = [
     "^(commit)$",
     "^(list)$",
     "^(help)$",
+    "^(shutdown)$",
     "^(script) ([^ ]*) ([^ ]*)$",
 ]
 
@@ -349,6 +360,7 @@ def usage():
     print "    rule del name <NAME>"
     print "    commit"
     print "    list"
+    print "    shutdown"
     print "    help"
     print
     print "Units: bps,kbps,mbps,bit,kbit,mbit"
@@ -390,6 +402,8 @@ def cmd_loop():
                 shaper.add_rule(parms.groups()[2], parms.groups()[3], parms.groups()[4], parms.groups()[5])
             elif parms.groups()[0] == "rule" and parms.groups()[1] == "del":
                 shaper.del_rule(parms.groups()[2])
+            elif parms.groups()[0] == "shutdown":
+                shaper.shutdown()
             elif parms.groups()[0] == "commit":
                 if not shaper.commit():
                     sys.stderr.write("Occured errors during tc script, i am not saving the state\n")
