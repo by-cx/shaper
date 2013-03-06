@@ -295,8 +295,8 @@ class Shaper(object):
     def shutdown(self):
         iface_up = "imq%d" % INTERFACES["up"][(self.iterator+1) % 2]
         iface_down = "imq%d" % INTERFACES["down"][(self.iterator+1) % 2]
-        run(" -t mangle -F SHAPER")
-        run(" -t mangle -F SHAPER")
+        run(IPTABLES + " -t mangle -F SHAPER")
+        run(IP6TABLES + " -t mangle -F SHAPER")
         run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_up})
         run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_down})
 
