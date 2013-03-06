@@ -10,6 +10,9 @@ class ShaperException(Exception): pass
 
 CONFIG_FILE = "/var/cache/shaper/shaper.data"
 
+IPTABLES = "/sbin/iptables"
+IP6TABLES = "/sbin/ip6tables"
+
 if not os.path.isdir("/var/cache/shaper"):
     os.makedirs("/var/cache/shaper")
 
@@ -270,21 +273,21 @@ class Shaper(object):
             if stdout: print stdout
 
         #TODO: make it universal
-        stdout, stderr = run("/usr/local/sbin/iptables -t mangle -L -n")
+        stdout, stderr = run(IPTABLES + " -t mangle -L -n")
         if not stdout or  "Chain SHAPER" not in stdout:
-            run("/usr/local/sbin/iptables -t mangle -N SHAPER")
-            run("/usr/local/sbin/ip6tables -t mangle -N SHAPER")
-            run("/usr/local/sbin/iptables -t mangle -A PREROUTING -j SHAPER")
-            run("/usr/local/sbin/iptables -t mangle -A POSTROUTING -j SHAPER")
-            run("/usr/local/sbin/ip6tables -t mangle -A PREROUTING -j SHAPER")
-            run("/usr/local/sbin/ip6tables -t mangle -A POSTROUTING -j SHAPER")
+            run(IPTABLES + " -t mangle -N SHAPER")
+            run(IP6TABLES + " -t mangle -N SHAPER")
+            run(IPTABLES + " -t mangle -A PREROUTING -j SHAPER")
+            run(IPTABLES + " -t mangle -A POSTROUTING -j SHAPER")
+            run(IP6TABLES + " -t mangle -A PREROUTING -j SHAPER")
+            run(IP6TABLES + " -t mangle -A POSTROUTING -j SHAPER")
 
-        run("/usr/local/sbin/iptables -t mangle -F SHAPER")
-        run("/usr/local/sbin/ip6tables -t mangle -F SHAPER")
-        run("/usr/local/sbin/iptables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
-        run("/usr/local/sbin/iptables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
-        run("/usr/local/sbin/ip6tables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
-        run("/usr/local/sbin/ip6tables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
+        run(IPTABLES + " -t mangle -F SHAPER")
+        run(IP6TABLES + " -t mangle -F SHAPER")
+        run(IPTABLES + " -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
+        run(IPTABLES + " -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
+        run(IP6TABLES + " -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
+        run(IP6TABLES + " -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
 
         self.iterator += 1
         return not error
@@ -292,8 +295,8 @@ class Shaper(object):
     def shutdown(self):
         iface_up = "imq%d" % INTERFACES["up"][(self.iterator+1) % 2]
         iface_down = "imq%d" % INTERFACES["down"][(self.iterator+1) % 2]
-        run("/usr/local/sbin/iptables -t mangle -F SHAPER")
-        run("/usr/local/sbin/ip6tables -t mangle -F SHAPER")
+        run(" -t mangle -F SHAPER")
+        run(" -t mangle -F SHAPER")
         run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_up})
         run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_down})
 
