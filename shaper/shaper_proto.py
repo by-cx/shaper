@@ -166,9 +166,9 @@ class Rule(object):
         if not self._ceil_down or not self._ceil_up:
             self._ceil_down = self._rate_down
             self._ceil_up = self._rate_up
-        if self._ceil_down < self._rate_down:
+        if self._get_value(self._ceil_down) < self._get_value(self._rate_down):
             raise ShaperException("Error: ceil have to be bigger than rate")
-        if self._ceil_up < self._rate_up:
+        if self._get_value(self._ceil_up) < self._get_value(self._rate_up):
             raise ShaperException("Error: ceil have to be bigger than rate")
 
     def get_rate(self):
@@ -188,9 +188,9 @@ class Rule(object):
         if not self._rate_down or not self._rate_up:
             self._rate_down = self._ceil_down
             self._rate_up = self._ceil_up
-        if self._ceil_down < self._rate_down:
+        if self._get_value(self._ceil_down) < self._get_value(self._rate_down):
             raise ShaperException("Error: ceil have to be bigger than rate")
-        if self._ceil_up < self._rate_up:
+        if self._get_value(self._ceil_up) < self._get_value(self._rate_up):
             raise ShaperException("Error: ceil have to be bigger than rate")
 
     def get_ceil(self):
