@@ -1,14 +1,18 @@
 import os
 import pickle
 import re
-import shlex
 import itertools
 from subprocess import Popen, PIPE
 import sys
 
+
 class ShaperException(Exception): pass
 
+
 CONFIG_FILE = "/var/cache/shaper/shaper.data"
+
+IPTABLES = "/sbin/iptables"
+IP6TABLES = "/sbin/ip6tables"
 
 if not os.path.isdir("/var/cache/shaper"):
     os.makedirs("/var/cache/shaper")
@@ -19,9 +23,9 @@ DEFS["hfsc"] = {
     "qdisc-root": "qdisc add dev %(iface)s root handle 1: hfsc",
     "qdisc": "qdisc add dev %(iface)s parent %(parent)s handle %(qid)s sfq perturb 10",
     "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s hfsc sc rate %(rate)s ul rate %(ceil)s",
-    "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip dst %(ip)s flowid %(qid)s",
-    "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 dst %(ip)s flowid %(qid)s",
-    }
+    "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match %(direction)s %(ip)s flowid %(qid)s",
+    "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip $(direction)s %(ip)s flowid %(qid)s",
+}
 DEFS["htb"] = {
     "qdisc-del": "qdisc del dev %(iface)s root",
     "qdisc-root": "qdisc add dev %(iface)s root handle 1: htb r2q 1",
@@ -29,15 +33,16 @@ DEFS["htb"] = {
     "class": "class add dev %(iface)s parent %(parent)s classid %(cid)s htb rate %(rate)s ceil %(ceil)s",
     "filter4": "filter add dev %(iface)s parent %(parent)s protocol ip prio 100 u32 match ip %(direction)s %(ip)s flowid %(qid)s",
     "filter6": "filter add dev %(iface)s parent %(parent)s protocol ip6 prio 200 u32 match ip6 %(direction)s %(ip)s flowid %(qid)s",
-    }
-DEF=DEFS["htb"]
+}
+DEF = DEFS["htb"]
 
-GLOBAL_CID=1
-GLOBAL_QID=2
+GLOBAL_CID = 1
+GLOBAL_QID = 2
 INTERFACES = {
     "up": (0, 2),
     "down": (1, 3),
 }
+
 
 class Rule(object):
     """Rule object"""
@@ -103,7 +108,7 @@ class Rule(object):
         l = []
         for child in self.childs:
             l.append("%s|- %s" % ("  " * index, child))
-            l += child.printable_list(index+1)
+            l += child.printable_list(index + 1)
         return l
 
     def get_childs_of_childs(self):
@@ -128,7 +133,7 @@ class Rule(object):
         if unit[0] == "k":
             value *= 1024
         if unit[0] == "m":
-            value *= 1024**2
+            value *= 1024 ** 2
         return value
 
     def add_child(self, rule):
@@ -136,13 +141,15 @@ class Rule(object):
             raise ShaperException("Error: you can't add child before you set the rate and ceil")
         if not rule._rate_up or not rule._ceil_up or not rule._rate_down or not rule._ceil_down:
             raise ShaperException("Error: you can't add child before you set the rate and ceil on child")
-        if self._get_value(rule._rate_up) + sum([self._get_value(x._rate_up) for x in self.childs]) > self._get_value(self._rate_up):
+        if self._get_value(rule._rate_up) + sum([self._get_value(x._rate_up) for x in self.childs]) > self._get_value(
+                self._rate_up):
             raise ShaperException("Error: Childs exceeded rate up of parent")
-        if self._get_value(rule._rate_down) + sum([self._get_value(x._rate_down) for x in self.childs]) > self._get_value(self._rate_down):
+        if self._get_value(rule._rate_down) + sum(
+                [self._get_value(x._rate_down) for x in self.childs]) > self._get_value(self._rate_down):
             raise ShaperException("Error: Childs exceeded rate down of parent")
         if self._get_value(rule._ceil_up) > self._get_value(self._ceil_up):
             raise ShaperException("Error: Child exceeded ceil up of parent")
-        if self._get_value(rule._ceil_down)  > self._get_value(self._ceil_down):
+        if self._get_value(rule._ceil_down) > self._get_value(self._ceil_down):
             raise ShaperException("Error: Child exceeded ceil down of parent")
         self._get_value(rule._rate_down)
         self.childs.append(rule)
@@ -159,12 +166,14 @@ class Rule(object):
         if not self._ceil_down or not self._ceil_up:
             self._ceil_down = self._rate_down
             self._ceil_up = self._rate_up
-        if self._ceil_down < self._rate_down:
+        if self._get_value(self._ceil_down) < self._get_value(self._rate_down):
             raise ShaperException("Error: ceil have to be bigger than rate")
-        if self._ceil_up < self._rate_up:
+        if self._get_value(self._ceil_up) < self._get_value(self._rate_up):
             raise ShaperException("Error: ceil have to be bigger than rate")
+
     def get_rate(self):
         return "%s/%s" % (self._rate_down, self._rate_up)
+
     rate = property(get_rate, set_rate)
 
     def set_ceil(self, value):
@@ -179,26 +188,31 @@ class Rule(object):
         if not self._rate_down or not self._rate_up:
             self._rate_down = self._ceil_down
             self._rate_up = self._ceil_up
-        if self._ceil_down < self._rate_down:
+        if self._get_value(self._ceil_down) < self._get_value(self._rate_down):
             raise ShaperException("Error: ceil have to be bigger than rate")
-        if self._ceil_up < self._rate_up:
+        if self._get_value(self._ceil_up) < self._get_value(self._rate_up):
             raise ShaperException("Error: ceil have to be bigger than rate")
+
     def get_ceil(self):
         return "%s/%s" % (self._ceil_down, self._ceil_up)
+
     ceil = property(get_ceil, set_ceil)
 
     def get_name(self):
         return self._name
+
     def set_name(self, value):
         if not re.match(self.rule_regexp3, value):
             raise ShaperException("Error: name is in wrong format - %s" % self.rule_regexp3)
         self._name = value
+
     name = property(get_name, set_name)
 
     def get_ip(self):
         return self._ip
+
     def set_ip(self, value):
-        pattern6="^(\A([0-9a-f]{1,4}:){1,1}(:[0-9a-f]{1,4}){1,6}\Z)|(\A([0-9a-f]{1,4}:){1,2}(:[0-9a-f]{1,4}){1,5}\Z)|(\A([0-9a-f]{1,4}:){1,3}(:[0-9a-f]{1,4}){1,4}\Z)|(\A([0-9a-f]{1,4}:){1,4}(:[0-9a-f]{1,4}){1,3}\Z)|(\A([0-9a-f]{1,4}:){1,5}(:[0-9a-f]{1,4}){1,2}\Z)|(\A([0-9a-f]{1,4}:){1,6}(:[0-9a-f]{1,4}){1,1}\Z)|(\A(([0-9a-f]{1,4}:){1,7}|:):\Z)|(\A:(:[0-9a-f]{1,4}){1,7}\Z)|(\A((([0-9a-f]{1,4}:){6})(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3})\Z)|(\A(([0-9a-f]{1,4}:){5}[0-9a-f]{1,4}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3})\Z)|(\A([0-9a-f]{1,4}:){5}:[0-9a-f]{1,4}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,1}(:[0-9a-f]{1,4}){1,4}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,2}(:[0-9a-f]{1,4}){1,3}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,3}(:[0-9a-f]{1,4}){1,2}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,4}(:[0-9a-f]{1,4}){1,1}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A(([0-9a-f]{1,4}:){1,5}|:):(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A:(:[0-9a-f]{1,4}){1,5}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)$"
+        pattern6 = "^(\A([0-9a-f]{1,4}:){1,1}(:[0-9a-f]{1,4}){1,6}\Z)|(\A([0-9a-f]{1,4}:){1,2}(:[0-9a-f]{1,4}){1,5}\Z)|(\A([0-9a-f]{1,4}:){1,3}(:[0-9a-f]{1,4}){1,4}\Z)|(\A([0-9a-f]{1,4}:){1,4}(:[0-9a-f]{1,4}){1,3}\Z)|(\A([0-9a-f]{1,4}:){1,5}(:[0-9a-f]{1,4}){1,2}\Z)|(\A([0-9a-f]{1,4}:){1,6}(:[0-9a-f]{1,4}){1,1}\Z)|(\A(([0-9a-f]{1,4}:){1,7}|:):\Z)|(\A:(:[0-9a-f]{1,4}){1,7}\Z)|(\A((([0-9a-f]{1,4}:){6})(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3})\Z)|(\A(([0-9a-f]{1,4}:){5}[0-9a-f]{1,4}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3})\Z)|(\A([0-9a-f]{1,4}:){5}:[0-9a-f]{1,4}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,1}(:[0-9a-f]{1,4}){1,4}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,2}(:[0-9a-f]{1,4}){1,3}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,3}(:[0-9a-f]{1,4}){1,2}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A([0-9a-f]{1,4}:){1,4}(:[0-9a-f]{1,4}){1,1}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A(([0-9a-f]{1,4}:){1,5}|:):(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)|(\A:(:[0-9a-f]{1,4}){1,5}:(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}\Z)$"
         if re.match("^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}[/]{0,1}[0-9]{0,2}$", value):
             self._ipv6 = False
             self._ip = value
@@ -207,6 +221,7 @@ class Rule(object):
             self._ip = value
         else:
             raise ShaperException("Error: bad IP format")
+
     ip = property(get_ip, set_ip)
 
     def __str__(self):
@@ -214,7 +229,6 @@ class Rule(object):
 
     def __unicode__(self):
         return unicode(self.__str__())
-
 
 
 class Shaper(object):
@@ -230,7 +244,7 @@ class Shaper(object):
         self.filters = []
 
     def find_child(self, name, exception=True):
-        rule = [x for x in [self.root]+self.root.get_childs_of_childs() if x.name == name]
+        rule = [x for x in [self.root] + self.root.get_childs_of_childs() if x.name == name]
         if not rule:
             if exception:
                 raise ShaperException("Error: can't find rule with this name (%s)" % name)
@@ -249,8 +263,8 @@ class Shaper(object):
         l.append(DEF["qdisc-del"] % {"iface": iface})
         l.append(DEF["qdisc-root"] % {"iface": iface})
         l += self.root.script("1:0", iface, direction)
-        GLOBAL_CID=1
-        GLOBAL_QID=2
+        GLOBAL_CID = 1
+        GLOBAL_QID = 2
         return l
 
     def commit(self):
@@ -270,30 +284,34 @@ class Shaper(object):
             if stdout: print stdout
 
         #TODO: make it universal
-        stdout, stderr = run("/usr/local/sbin/iptables -t mangle -L -n")
-        if not stdout or  "Chain SHAPER" not in stdout:
-            run("/usr/local/sbin/iptables -t mangle -N SHAPER")
-            run("/usr/local/sbin/ip6tables -t mangle -N SHAPER")
-            run("/usr/local/sbin/iptables -t mangle -A PREROUTING -j SHAPER")
-            run("/usr/local/sbin/iptables -t mangle -A POSTROUTING -j SHAPER")
-            run("/usr/local/sbin/ip6tables -t mangle -A PREROUTING -j SHAPER")
-            run("/usr/local/sbin/ip6tables -t mangle -A POSTROUTING -j SHAPER")
+        stdout, stderr = run(IPTABLES + " -t mangle -L -n")
+        if not stdout or "Chain SHAPER" not in stdout:
+            run(IPTABLES + " -t mangle -N SHAPER")
+            run(IP6TABLES + " -t mangle -N SHAPER")
+            run(IPTABLES + " -t mangle -A PREROUTING -j SHAPER")
+            run(IPTABLES + " -t mangle -A POSTROUTING -j SHAPER")
+            run(IP6TABLES + " -t mangle -A PREROUTING -j SHAPER")
+            run(IP6TABLES + " -t mangle -A POSTROUTING -j SHAPER")
 
-        run("/usr/local/sbin/iptables -t mangle -F SHAPER")
-        run("/usr/local/sbin/ip6tables -t mangle -F SHAPER")
-        run("/usr/local/sbin/iptables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
-        run("/usr/local/sbin/iptables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
-        run("/usr/local/sbin/ip6tables -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (self.iface, INTERFACES["down"][self.iterator % 2]))
-        run("/usr/local/sbin/ip6tables -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (self.iface, INTERFACES["up"][self.iterator % 2]))
+        run(IPTABLES + " -t mangle -F SHAPER")
+        run(IP6TABLES + " -t mangle -F SHAPER")
+        run(IPTABLES + " -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (
+            self.iface, INTERFACES["down"][self.iterator % 2]))
+        run(IPTABLES + " -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (
+            self.iface, INTERFACES["up"][self.iterator % 2]))
+        run(IP6TABLES + " -t mangle -A SHAPER -i %s -j IMQ --todev %d" % (
+            self.iface, INTERFACES["down"][self.iterator % 2]))
+        run(IP6TABLES + " -t mangle -A SHAPER -o %s -j IMQ --todev %d" % (
+            self.iface, INTERFACES["up"][self.iterator % 2]))
 
         self.iterator += 1
         return not error
 
     def shutdown(self):
-        iface_up = "imq%d" % INTERFACES["up"][(self.iterator+1) % 2]
-        iface_down = "imq%d" % INTERFACES["down"][(self.iterator+1) % 2]
-        run("/usr/local/sbin/iptables -t mangle -F SHAPER")
-        run("/usr/local/sbin/ip6tables -t mangle -F SHAPER")
+        iface_up = "imq%d" % INTERFACES["up"][(self.iterator + 1) % 2]
+        iface_down = "imq%d" % INTERFACES["down"][(self.iterator + 1) % 2]
+        run(IPTABLES + " -t mangle -F SHAPER")
+        run(IP6TABLES + " -t mangle -F SHAPER")
         run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_up})
         run("/sbin/tc " + DEF["qdisc-del"] % {"iface": iface_down})
 
@@ -319,6 +337,7 @@ class Shaper(object):
 def run(cmd):
     p = Popen(cmd.split(), stdout=PIPE, stderr=PIPE)
     return p.communicate()
+
 
 def save(shaper):
     with open(CONFIG_FILE, "w") as f:
@@ -352,6 +371,7 @@ CMDS = [
     "^(script) ([^ ]*) ([^ ]*)$",
 ]
 
+
 def usage():
     print "Usage"
     print "    init rate <RATE> ceil <CEIL> iface <IFACE>"
@@ -382,6 +402,7 @@ def usage():
     print "    2 - caught exception, state is saved"
     print "    3 - error during script execution, state is not saved"
 
+
 def cmd_loop():
     shaper = load()
     if not shaper and not (len(sys.argv) >= 2 and sys.argv[1] == "init"):
@@ -397,7 +418,8 @@ def cmd_loop():
             if parms.groups()[0] == "init":
                 shaper = init(parms.groups()[3], parms.groups()[1], parms.groups()[2])
             elif parms.groups()[0] == "rule" and parms.groups()[1] == "add" and len(parms.groups()) == 7:
-                shaper.add_rule(parms.groups()[2], parms.groups()[3], parms.groups()[4], parms.groups()[5], parms.groups()[6])
+                shaper.add_rule(parms.groups()[2], parms.groups()[3], parms.groups()[4], parms.groups()[5],
+                                parms.groups()[6])
             elif parms.groups()[0] == "rule" and parms.groups()[1] == "add":
                 shaper.add_rule(parms.groups()[2], parms.groups()[3], parms.groups()[4], parms.groups()[5])
             elif parms.groups()[0] == "rule" and parms.groups()[1] == "del":
@@ -427,6 +449,7 @@ def main():
     except ShaperException as e:
         sys.stderr.write("%s\n" % e)
         sys.exit(2)
+
 
 if __name__ == "__main__":
     try:
